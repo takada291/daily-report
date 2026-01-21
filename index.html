@@ -1,0 +1,494 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>作業日報 v0.0</title>
+    
+    <link rel="manifest" href="manifest.json">
+    <meta name="theme-color" content="#28a745">
+    
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black">
+    <meta name="apple-mobile-web-app-title" content="作業日報">
+    <link rel="apple-touch-icon" href="icon-192.png">
+
+    <style>
+        body { font-family: -apple-system, sans-serif; padding: 10px; background: #f0f2f5; color: #333; margin: 0; }
+        .card { background: white; padding: 15px; border-radius: 12px; box-shadow: 0 2px 8px rgba(0,0,0,0.1); margin-bottom: 20px; }
+        
+        .header-area { display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid #28a745; margin-bottom: 15px; padding-bottom: 5px; }
+        h2 { margin: 0; font-size: 1.2em; color: #2c3e50; }
+        .settings-btn { background: #6c757d; color: white; padding: 6px 12px; font-size: 0.85em; border-radius: 6px; border: none; cursor: pointer; }
+
+        /* 入力フォームのスタイル */
+        .form-group { margin-bottom: 12px; }
+        .form-label { font-weight: bold; display: block; margin-bottom: 5px; font-size: 0.9em; }
+        .form-control { width: 100%; padding: 10px; border: 1px solid #ccc; border-radius: 6px; font-size: 16px; box-sizing: border-box; background: #fff; height: 44px; }
+        
+        /* 作業項目のグリッドレイアウト */
+        .task-row { display: grid; grid-template-columns: 3fr 2fr 4fr; gap: 5px; align-items: center; margin-bottom: 8px; border-bottom: 1px solid #eee; padding-bottom: 8px; }
+        .task-row.no-machine { grid-template-columns: 3fr 2fr 4fr; } /* 機械なし行もレイアウト合わせ */
+        .task-name { font-size: 0.9em; font-weight: bold; }
+        .task-time select, .task-machine select { width: 100%; padding: 8px; border: 1px solid #ccc; border-radius: 4px; font-size: 14px; background: #fff; }
+        
+        .total-area { text-align: right; font-weight: bold; font-size: 1.1em; margin-top: 10px; padding-top: 10px; border-top: 2px solid #ddd; }
+        .alert-red { color: #dc3545; }
+
+        /* ボタン群 */
+        .btn-group { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 20px; }
+        button { flex: 1; padding: 12px; font-size: 14px; border: none; border-radius: 6px; cursor: pointer; color: white; font-weight: bold; }
+        .save-btn { background: #007bff; }
+        .clear-btn { background: #fff; color: #dc3545; border: 1px solid #dc3545; flex: 0 0 auto; }
+        .export-btn { background: #28a745; }
+        
+        /* テーブル */
+        .table-container { overflow-x: auto; margin-top: 10px; }
+        table { width: 100%; border-collapse: collapse; font-size: 12px; min-width: 600px; white-space: nowrap; }
+        th, td { border: 1px solid #ddd; padding: 6px; text-align: center; }
+        th { background: #e9ecef; }
+        .del-btn { background: #dc3545; color: white; padding: 4px 8px; border-radius: 4px; font-size: 11px; width: auto; }
+
+        /* モーダル */
+        .modal { display: none; position: fixed; z-index: 100; left: 0; top: 0; width: 100%; height: 100%; background-color: rgba(0,0,0,0.5); }
+        .modal-content { background-color: #fff; margin: 10% auto; padding: 20px; border-radius: 12px; width: 90%; max-width: 400px; max-height: 80vh; overflow-y: auto; }
+        .modal-header { font-weight: bold; font-size: 1.1em; margin-bottom: 15px; border-bottom: 1px solid #ddd; }
+        .modal-section { margin-bottom: 15px; border: 1px solid #eee; padding: 10px; border-radius: 8px; }
+        .modal-section h4 { margin: 0 0 10px 0; font-size: 0.9em; color: #007bff; }
+        .setting-input { width: 100%; margin-bottom: 5px; padding: 8px; box-sizing: border-box; border: 1px solid #ccc; border-radius: 4px; }
+        .close-btn { background: #6c757d; margin-top: 10px; }
+
+    </style>
+</head>
+<body>
+
+<div class="card">
+    <div class="header-area">
+        <h2>作業日報 v0.0</h2>
+        <button class="settings-btn" onclick="openSettings()">⚙️ 設定</button>
+    </div>
+
+    <div class="form-group">
+        <label class="form-label">作業日</label>
+        <input type="date" id="workDate" class="form-control">
+    </div>
+
+    <div class="form-group">
+        <label class="form-label">現場名</label>
+        <select id="siteName" class="form-control">
+            <option value="">(選択してください)</option>
+        </select>
+    </div>
+
+    <div class="form-group">
+        <label class="form-label">作業員</label>
+        <select id="workerName" class="form-control">
+            <option value="">(選択してください)</option>
+        </select>
+    </div>
+
+    <hr>
+
+    <div style="font-size:0.8em; color:#666; margin-bottom:5px; display:flex; justify-content:space-between;">
+        <span>作業項目</span>
+        <span style="margin-left:auto; margin-right:45px;">時間</span>
+        <span>使用機械</span>
+    </div>
+
+    <div id="tasksContainer">
+        </div>
+
+    <div class="total-area" id="totalArea">
+        合計: <span id="totalHours">0</span> 時間
+    </div>
+
+    <div class="form-group" style="margin-top:15px;">
+        <label class="form-label">特記事項</label>
+        <input type="text" id="specialNote" class="form-control" placeholder="特になし">
+    </div>
+
+    <div class="btn-group">
+        <button class="save-btn" onclick="handleSave()">保存</button>
+        <button class="clear-btn" onclick="clearInputs()">入力クリア</button>
+        <button class="export-btn" onclick="handleExport()">CSV出力</button>
+    </div>
+</div>
+
+<div class="card">
+    <div style="display:flex; justify-content:space-between; align-items:center;">
+        <h2>登録済みデータ</h2>
+        <button class="clear-btn" style="padding:4px 8px; font-size:11px;" onclick="handleAllClear()">全消去</button>
+    </div>
+    <div class="table-container">
+        <table>
+            <thead>
+                <tr>
+                    <th>操作</th>
+                    <th>日付</th>
+                    <th>現場</th>
+                    <th>作業員</th>
+                    <th>合計時間</th>
+                    <th>内容(抜粋)</th>
+                </tr>
+            </thead>
+            <tbody id="tableBody"></tbody>
+        </table>
+    </div>
+</div>
+
+<div id="settingsModal" class="modal">
+    <div class="modal-content">
+        <div class="modal-header">アプリ設定</div>
+        
+        <div class="modal-section">
+            <h4>現場名 (最大5件)</h4>
+            <div id="siteInputs"></div>
+        </div>
+
+        <div class="modal-section">
+            <h4>作業員 (最大5件)</h4>
+            <div id="workerInputs"></div>
+        </div>
+
+        <div class="modal-section">
+            <h4>使用機械 (最大5件)</h4>
+            <div id="machineInputs"></div>
+        </div>
+
+        <button class="save-btn" onclick="saveSettings()">設定を保存</button>
+        <button class="close-btn" onclick="closeSettings()">閉じる</button>
+    </div>
+</div>
+
+<script>
+    const STORAGE_KEY = 'forestry_daily_report_v1_data';
+    const SETTINGS_KEY = 'forestry_daily_report_settings';
+
+    // 作業項目の定義 (hasMachine: 機械選択が必要かどうか)
+    const TASK_DEFINITIONS = [
+        { id: 'felling', name: '伐倒', hasMachine: true },
+        { id: 'processing', name: '造材', hasMachine: true },
+        { id: 'extraction', name: '搬出', hasMachine: true },
+        { id: 'stacking', name: '椪積', hasMachine: true },
+        { id: 'transport', name: '運搬', hasMachine: true },
+        { id: 'road', name: '開設', hasMachine: true },
+        { id: 'prep', name: '地拵え', hasMachine: true },
+        { id: 'planting', name: '植付け', hasMachine: false },
+        { id: 'weeding', name: '下刈り', hasMachine: false },
+        { id: 'snow', name: '雪起し', hasMachine: false },
+        { id: 'clearing', name: '除伐', hasMachine: false },
+        { id: 'pruning', name: '枝打ち', hasMachine: false }
+    ];
+
+    // デフォルト設定
+    let settings = {
+        sites: ["奥山その1皆伐"],
+        workers: ["福井 太郎"],
+        machines: ["ハーベスタ No1", "プロセッサ No1", "グラップル No1", "フォワーダ No1", "バックホウ No1"]
+    };
+
+    // 初期化
+    window.onload = function() {
+        // 今日の日付をセット
+        document.getElementById('workDate').valueAsDate = new Date();
+        
+        loadSettings();
+        renderTaskInputs();
+        updateSelectOptions(); // 設定から選択肢を反映
+        renderTable();
+    };
+
+    // Service Worker登録
+    if ('serviceWorker' in navigator) {
+        navigator.serviceWorker.register('sw.js').catch(err => console.log(err));
+    }
+
+    // 作業入力欄の生成
+    function renderTaskInputs() {
+        const container = document.getElementById('tasksContainer');
+        container.innerHTML = '';
+
+        TASK_DEFINITIONS.forEach(task => {
+            const row = document.createElement('div');
+            row.className = 'task-row' + (task.hasMachine ? '' : ' no-machine');
+
+            // 時間選択肢 (0-8)
+            let timeOpts = '<option value="0">0</option>';
+            for(let i=1; i<=8; i++) timeOpts += `<option value="${i}">${i}</option>`;
+
+            // 機械選択HTML (機械が必要な場合のみ表示)
+            let machineHtml = '';
+            if (task.hasMachine) {
+                machineHtml = `<div class="task-machine">
+                    <select id="machine_${task.id}">
+                        <option value="">-</option>
+                        </select>
+                </div>`;
+            } else {
+                machineHtml = `<div></div>`; // 空白埋め
+            }
+
+            row.innerHTML = `
+                <div class="task-name">${task.name}</div>
+                <div class="task-time">
+                    <select id="time_${task.id}" onchange="calcTotal()">${timeOpts}</select>
+                </div>
+                ${machineHtml}
+            `;
+            container.appendChild(row);
+        });
+    }
+
+    // 設定読み込み
+    function loadSettings() {
+        const saved = localStorage.getItem(SETTINGS_KEY);
+        if (saved) settings = JSON.parse(saved);
+        
+        // 設定モーダルの入力欄を生成
+        generateSettingInputs('siteInputs', 'site', settings.sites);
+        generateSettingInputs('workerInputs', 'worker', settings.workers);
+        generateSettingInputs('machineInputs', 'machine', settings.machines);
+    }
+
+    // 設定モーダルのinput生成ヘルパー
+    function generateSettingInputs(containerId, prefix, values) {
+        const container = document.getElementById(containerId);
+        container.innerHTML = '';
+        for(let i=0; i<5; i++) {
+            const input = document.createElement('input');
+            input.type = 'text';
+            input.className = 'setting-input';
+            input.id = `setting_${prefix}_${i}`;
+            input.value = values[i] || '';
+            input.placeholder = `${i+1}つめ`;
+            container.appendChild(input);
+        }
+    }
+
+    // 設定保存
+    function saveSettings() {
+        const getVals = (prefix) => {
+            let arr = [];
+            for(let i=0; i<5; i++) {
+                const val = document.getElementById(`setting_${prefix}_${i}`).value.trim();
+                if(val) arr.push(val);
+            }
+            return arr;
+        };
+
+        settings.sites = getVals('site');
+        settings.workers = getVals('worker');
+        settings.machines = getVals('machine');
+
+        localStorage.setItem(SETTINGS_KEY, JSON.stringify(settings));
+        updateSelectOptions();
+        closeSettings();
+        alert('設定を保存しました');
+    }
+
+    // 画面のセレクトボックスを選択肢で更新
+    function updateSelectOptions() {
+        // 現場名
+        const siteSel = document.getElementById('siteName');
+        siteSel.innerHTML = '<option value="">(現場を選択)</option>';
+        settings.sites.forEach(s => siteSel.add(new Option(s, s)));
+
+        // 作業員
+        const workerSel = document.getElementById('workerName');
+        workerSel.innerHTML = '<option value="">(作業員を選択)</option>';
+        settings.workers.forEach(w => workerSel.add(new Option(w, w)));
+
+        // 各作業の機械選択肢
+        TASK_DEFINITIONS.forEach(task => {
+            if(task.hasMachine) {
+                const macSel = document.getElementById(`machine_${task.id}`);
+                const currentVal = macSel.value; // 選択状態を維持
+                macSel.innerHTML = '<option value="">-</option>';
+                settings.machines.forEach(m => macSel.add(new Option(m, m)));
+                if(currentVal) macSel.value = currentVal;
+            }
+        });
+    }
+
+    // 合計時間計算
+    function calcTotal() {
+        let total = 0;
+        TASK_DEFINITIONS.forEach(task => {
+            const val = parseInt(document.getElementById(`time_${task.id}`).value) || 0;
+            total += val;
+        });
+        
+        const el = document.getElementById('totalHours');
+        const area = document.getElementById('totalArea');
+        el.innerText = total;
+        
+        if (total > 8) {
+            area.classList.add('alert-red');
+            area.innerHTML = `合計: <span id="totalHours">${total}</span> 時間 (8時間を超えています)`;
+        } else {
+            area.classList.remove('alert-red');
+            area.innerHTML = `合計: <span id="totalHours">${total}</span> 時間`;
+        }
+        return total;
+    }
+
+    // 保存処理
+    function handleSave() {
+        const date = document.getElementById('workDate').value;
+        const site = document.getElementById('siteName').value;
+        const worker = document.getElementById('workerName').value;
+        const note = document.getElementById('specialNote').value;
+        const total = calcTotal();
+
+        if (!date || !site || !worker) {
+            alert('日付、現場名、作業員は必須です');
+            return;
+        }
+
+        // 作業詳細データの構築
+        let taskDetails = {};
+        TASK_DEFINITIONS.forEach(task => {
+            const time = document.getElementById(`time_${task.id}`).value;
+            if(task.hasMachine) {
+                const mac = document.getElementById(`machine_${task.id}`).value;
+                taskDetails[task.id] = { time: time, machine: mac };
+            } else {
+                taskDetails[task.id] = { time: time, machine: '' };
+            }
+        });
+
+        const record = {
+            id: Date.now(),
+            date: date,
+            site: site,
+            worker: worker,
+            tasks: taskDetails,
+            total: total,
+            note: note
+        };
+
+        // 保存
+        const list = JSON.parse(localStorage.getItem(STORAGE_KEY) || '[]');
+        list.unshift(record);
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(list));
+
+        // クリア＆再表示
+        clearInputs();
+        // 日付、現場、作業員は連続入力のために残す場合はここを調整（今回は仕様通りクリア）
+        // ただし日付は今日に戻す
+        document.getElementById('workDate').valueAsDate = new Date();
+        
+        renderTable();
+        alert('保存しました');
+    }
+
+    // 入力クリア
+    function clearInputs() {
+        // document.getElementById('workDate').value = ''; // 日付はクリアしない方が使いやすいが仕様によりクリア
+        document.getElementById('siteName').value = '';
+        document.getElementById('workerName').value = '';
+        document.getElementById('specialNote').value = '';
+        
+        TASK_DEFINITIONS.forEach(task => {
+            document.getElementById(`time_${task.id}`).value = '0';
+            if(task.hasMachine) document.getElementById(`machine_${task.id}`).value = '';
+        });
+        calcTotal();
+    }
+
+    // テーブル表示
+    function renderTable() {
+        const list = JSON.parse(localStorage.getItem(STORAGE_KEY) || '[]');
+        const tbody = document.getElementById('tableBody');
+        tbody.innerHTML = '';
+
+        list.forEach(item => {
+            // 作業内容の要約を作成（時間が0より大きいもののみ列挙）
+            let summary = [];
+            TASK_DEFINITIONS.forEach(def => {
+                if(item.tasks[def.id] && item.tasks[def.id].time > 0) {
+                    summary.push(`${def.name}(${item.tasks[def.id].time}h)`);
+                }
+            });
+
+            const row = document.createElement('tr');
+            row.innerHTML = `
+                <td><button class="del-btn" onclick="deleteItem(${item.id})">削除</button></td>
+                <td>${item.date}</td>
+                <td>${item.site}</td>
+                <td>${item.worker}</td>
+                <td>${item.total}h</td>
+                <td style="text-align:left;">${summary.join(', ')}</td>
+            `;
+            tbody.appendChild(row);
+        });
+    }
+
+    // 削除処理
+    function deleteItem(id) {
+        if(!confirm('削除しますか？')) return;
+        let list = JSON.parse(localStorage.getItem(STORAGE_KEY) || '[]');
+        list = list.filter(i => i.id !== id);
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(list));
+        renderTable();
+    }
+
+    // 全消去
+    function handleAllClear() {
+        if(!confirm('全てのデータを消去しますか？')) return;
+        localStorage.removeItem(STORAGE_KEY);
+        renderTable();
+    }
+
+    // CSV出力
+    function handleExport() {
+        const list = JSON.parse(localStorage.getItem(STORAGE_KEY) || '[]');
+        if(list.length === 0) { alert('データがありません'); return; }
+
+        // ヘッダー作成
+        let headers = ['日付', '現場名', '作業員', '合計時間', '特記事項'];
+        TASK_DEFINITIONS.forEach(t => {
+            headers.push(`${t.name}_時間`);
+            if(t.hasMachine) headers.push(`${t.name}_機械`);
+        });
+        
+        let csv = '\ufeff' + headers.join(',') + '\n';
+
+        // データ行作成
+        list.forEach(item => {
+            let row = [
+                item.date,
+                item.site,
+                item.worker,
+                item.total,
+                (item.note || '').replace(/,/g, ' ') // カンマ除去
+            ];
+
+            TASK_DEFINITIONS.forEach(t => {
+                const taskData = item.tasks[t.id] || { time: 0, machine: '' };
+                row.push(taskData.time);
+                if(t.hasMachine) row.push(taskData.machine);
+            });
+
+            csv += row.join(',') + '\n';
+        });
+
+        const blob = new Blob([csv], { type: 'text/csv' });
+        const url = window.URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        
+        const now = new Date();
+        const fname = `作業日報_${now.getFullYear()}${(now.getMonth()+1).toString().padStart(2,'0')}${now.getDate().toString().padStart(2,'0')}.csv`;
+        
+        a.href = url;
+        a.download = fname;
+        a.click();
+        window.URL.revokeObjectURL(url);
+    }
+
+    // モーダル制御
+    function openSettings() { document.getElementById('settingsModal').style.display = 'block'; }
+    function closeSettings() { document.getElementById('settingsModal').style.display = 'none'; }
+</script>
+</body>
+</html>
