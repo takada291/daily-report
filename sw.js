@@ -1,4 +1,4 @@
-const CACHE_NAME = 'daily-report-v0.2';
+const CACHE_NAME = 'daily-report-v1.0';
 const urlsToCache = [
   './',
   'index.html',
@@ -37,3 +37,4 @@ self.addEventListener('fetch', (event) => {
     })
   );
 });
+
