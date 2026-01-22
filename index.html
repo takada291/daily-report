@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>作業日報 v0.0</title>
+    <title>作業日報 v0.1</title>
     
     <link rel="manifest" href="manifest.json">
     <meta name="theme-color" content="#28a745">
@@ -24,11 +24,11 @@
         /* 入力フォームのスタイル */
         .form-group { margin-bottom: 12px; }
         .form-label { font-weight: bold; display: block; margin-bottom: 5px; font-size: 0.9em; }
-        .form-control { width: 100%; padding: 10px; border: 1px solid #ccc; border-radius: 6px; font-size: 16px; box-sizing: border-box; background: #fff; height: 44px; }
+        .form-control { width: 100%; max-width: 100%; padding: 10px; border: 1px solid #ccc; border-radius: 6px; font-size: 16px; box-sizing: border-box; background: #fff; height: 44px; }
         
         /* 作業項目のグリッドレイアウト */
         .task-row { display: grid; grid-template-columns: 3fr 2fr 4fr; gap: 5px; align-items: center; margin-bottom: 8px; border-bottom: 1px solid #eee; padding-bottom: 8px; }
-        .task-row.no-machine { grid-template-columns: 3fr 2fr 4fr; } /* 機械なし行もレイアウト合わせ */
+        .task-row.no-machine { grid-template-columns: 3fr 2fr 4fr; }
         .task-name { font-size: 0.9em; font-weight: bold; }
         .task-time select, .task-machine select { width: 100%; padding: 8px; border: 1px solid #ccc; border-radius: 4px; font-size: 14px; background: #fff; }
         
@@ -39,6 +39,7 @@
         .btn-group { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 20px; }
         button { flex: 1; padding: 12px; font-size: 14px; border: none; border-radius: 6px; cursor: pointer; color: white; font-weight: bold; }
         .save-btn { background: #007bff; }
+        .save-btn:disabled { background: #ccc; cursor: not-allowed; } /* 無効化時のスタイル */
         .clear-btn { background: #fff; color: #dc3545; border: 1px solid #dc3545; flex: 0 0 auto; }
         .export-btn { background: #28a745; }
         
@@ -64,7 +65,7 @@
 
 <div class="card">
     <div class="header-area">
-        <h2>作業日報 v0.0</h2>
+        <h2>作業日報 v0.1</h2>
         <button class="settings-btn" onclick="openSettings()">⚙️ 設定</button>
     </div>
 
@@ -104,11 +105,11 @@
 
     <div class="form-group" style="margin-top:15px;">
         <label class="form-label">特記事項</label>
-        <input type="text" id="specialNote" class="form-control" placeholder="特になし">
+        <input type="text" id="specialNote" class="form-control" placeholder="特になし" autocomplete="off">
     </div>
 
     <div class="btn-group">
-        <button class="save-btn" onclick="handleSave()">保存</button>
+        <button id="saveBtn" class="save-btn" onclick="handleSave()">保存</button>
         <button class="clear-btn" onclick="clearInputs()">入力クリア</button>
         <button class="export-btn" onclick="handleExport()">CSV出力</button>
     </div>
@@ -164,9 +165,10 @@
     const STORAGE_KEY = 'forestry_daily_report_v1_data';
     const SETTINGS_KEY = 'forestry_daily_report_settings';
 
-    // 作業項目の定義 (hasMachine: 機械選択が必要かどうか)
+    // 作業項目の定義 (集材を追加)
     const TASK_DEFINITIONS = [
         { id: 'felling', name: '伐倒', hasMachine: true },
+        { id: 'yarding', name: '集材', hasMachine: true }, // 追加
         { id: 'processing', name: '造材', hasMachine: true },
         { id: 'extraction', name: '搬出', hasMachine: true },
         { id: 'stacking', name: '椪積', hasMachine: true },
@@ -180,21 +182,19 @@
         { id: 'pruning', name: '枝打ち', hasMachine: false }
     ];
 
-    // デフォルト設定
+    // デフォルト設定 (トラックNo1に変更)
     let settings = {
         sites: ["奥山その1皆伐"],
         workers: ["福井 太郎"],
-        machines: ["ハーベスタ No1", "プロセッサ No1", "グラップル No1", "フォワーダ No1", "バックホウ No1"]
+        machines: ["トラック No1", "ハーベスタ No1", "プロセッサ No1", "グラップル No1", "バックホウ No1"]
     };
 
     // 初期化
     window.onload = function() {
-        // 今日の日付をセット
         document.getElementById('workDate').valueAsDate = new Date();
-        
         loadSettings();
         renderTaskInputs();
-        updateSelectOptions(); // 設定から選択肢を反映
+        updateSelectOptions(); 
         renderTable();
     };
 
@@ -212,20 +212,20 @@
             const row = document.createElement('div');
             row.className = 'task-row' + (task.hasMachine ? '' : ' no-machine');
 
-            // 時間選択肢 (0-8)
+            // 時間選択肢
             let timeOpts = '<option value="0">0</option>';
             for(let i=1; i<=8; i++) timeOpts += `<option value="${i}">${i}</option>`;
 
-            // 機械選択HTML (機械が必要な場合のみ表示)
+            // 機械選択HTML
             let machineHtml = '';
             if (task.hasMachine) {
                 machineHtml = `<div class="task-machine">
                     <select id="machine_${task.id}">
                         <option value="">-</option>
-                        </select>
+                    </select>
                 </div>`;
             } else {
-                machineHtml = `<div></div>`; // 空白埋め
+                machineHtml = `<div></div>`; 
             }
 
             row.innerHTML = `
@@ -243,14 +243,12 @@
     function loadSettings() {
         const saved = localStorage.getItem(SETTINGS_KEY);
         if (saved) settings = JSON.parse(saved);
-        
-        // 設定モーダルの入力欄を生成
         generateSettingInputs('siteInputs', 'site', settings.sites);
         generateSettingInputs('workerInputs', 'worker', settings.workers);
         generateSettingInputs('machineInputs', 'machine', settings.machines);
     }
 
-    // 設定モーダルのinput生成ヘルパー
+    // 設定モーダルのinput生成
     function generateSettingInputs(containerId, prefix, values) {
         const container = document.getElementById(containerId);
         container.innerHTML = '';
@@ -281,28 +279,35 @@
         settings.machines = getVals('machine');
 
         localStorage.setItem(SETTINGS_KEY, JSON.stringify(settings));
+        
+        // ここで現在の選択値を保持しながら選択肢を更新
         updateSelectOptions();
+        
         closeSettings();
         alert('設定を保存しました');
     }
 
-    // 画面のセレクトボックスを選択肢で更新
+    // セレクトボックス更新（選択中の値を維持）
     function updateSelectOptions() {
         // 現場名
         const siteSel = document.getElementById('siteName');
-        siteSel.innerHTML = '<option value="">(現場を選択)</option>';
+        const currentSite = siteSel.value;
+        siteSel.innerHTML = '<option value="">(選択してください)</option>';
         settings.sites.forEach(s => siteSel.add(new Option(s, s)));
+        if(settings.sites.includes(currentSite)) siteSel.value = currentSite;
 
         // 作業員
         const workerSel = document.getElementById('workerName');
-        workerSel.innerHTML = '<option value="">(作業員を選択)</option>';
+        const currentWorker = workerSel.value;
+        workerSel.innerHTML = '<option value="">(選択してください)</option>';
         settings.workers.forEach(w => workerSel.add(new Option(w, w)));
+        if(settings.workers.includes(currentWorker)) workerSel.value = currentWorker;
 
-        // 各作業の機械選択肢
+        // 機械
         TASK_DEFINITIONS.forEach(task => {
             if(task.hasMachine) {
                 const macSel = document.getElementById(`machine_${task.id}`);
-                const currentVal = macSel.value; // 選択状態を維持
+                const currentVal = macSel.value;
                 macSel.innerHTML = '<option value="">-</option>';
                 settings.machines.forEach(m => macSel.add(new Option(m, m)));
                 if(currentVal) macSel.value = currentVal;
@@ -310,7 +315,7 @@
         });
     }
 
-    // 合計時間計算
+    // 合計時間計算と保存ボタン制御
     function calcTotal() {
         let total = 0;
         TASK_DEFINITIONS.forEach(task => {
@@ -320,14 +325,18 @@
         
         const el = document.getElementById('totalHours');
         const area = document.getElementById('totalArea');
+        const saveBtn = document.getElementById('saveBtn');
+
         el.innerText = total;
         
-        if (total > 8) {
+        if (total >= 9) {
             area.classList.add('alert-red');
-            area.innerHTML = `合計: <span id="totalHours">${total}</span> 時間 (8時間を超えています)`;
+            area.innerHTML = `合計: <span id="totalHours">${total}</span> 時間 (9時間以上は保存不可)`;
+            saveBtn.disabled = true;
         } else {
             area.classList.remove('alert-red');
             area.innerHTML = `合計: <span id="totalHours">${total}</span> 時間`;
+            saveBtn.disabled = false;
         }
         return total;
     }
@@ -340,12 +349,16 @@
         const note = document.getElementById('specialNote').value;
         const total = calcTotal();
 
+        if (total >= 9) {
+            alert('合計時間が9時間以上のため保存できません');
+            return;
+        }
+
         if (!date || !site || !worker) {
             alert('日付、現場名、作業員は必須です');
             return;
         }
 
-        // 作業詳細データの構築
         let taskDetails = {};
         TASK_DEFINITIONS.forEach(task => {
             const time = document.getElementById(`time_${task.id}`).value;
@@ -367,15 +380,11 @@
             note: note
         };
 
-        // 保存
         const list = JSON.parse(localStorage.getItem(STORAGE_KEY) || '[]');
         list.unshift(record);
         localStorage.setItem(STORAGE_KEY, JSON.stringify(list));
 
-        // クリア＆再表示
         clearInputs();
-        // 日付、現場、作業員は連続入力のために残す場合はここを調整（今回は仕様通りクリア）
-        // ただし日付は今日に戻す
         document.getElementById('workDate').valueAsDate = new Date();
         
         renderTable();
@@ -384,7 +393,6 @@
 
     // 入力クリア
     function clearInputs() {
-        // document.getElementById('workDate').value = ''; // 日付はクリアしない方が使いやすいが仕様によりクリア
         document.getElementById('siteName').value = '';
         document.getElementById('workerName').value = '';
         document.getElementById('specialNote').value = '';
@@ -403,7 +411,6 @@
         tbody.innerHTML = '';
 
         list.forEach(item => {
-            // 作業内容の要約を作成（時間が0より大きいもののみ列挙）
             let summary = [];
             TASK_DEFINITIONS.forEach(def => {
                 if(item.tasks[def.id] && item.tasks[def.id].time > 0) {
@@ -424,7 +431,6 @@
         });
     }
 
-    // 削除処理
     function deleteItem(id) {
         if(!confirm('削除しますか？')) return;
         let list = JSON.parse(localStorage.getItem(STORAGE_KEY) || '[]');
@@ -433,19 +439,17 @@
         renderTable();
     }
 
-    // 全消去
     function handleAllClear() {
         if(!confirm('全てのデータを消去しますか？')) return;
         localStorage.removeItem(STORAGE_KEY);
         renderTable();
     }
 
-    // CSV出力
+    // CSV出力（ファイル名変更対応）
     function handleExport() {
         const list = JSON.parse(localStorage.getItem(STORAGE_KEY) || '[]');
         if(list.length === 0) { alert('データがありません'); return; }
 
-        // ヘッダー作成
         let headers = ['日付', '現場名', '作業員', '合計時間', '特記事項'];
         TASK_DEFINITIONS.forEach(t => {
             headers.push(`${t.name}_時間`);
@@ -454,14 +458,13 @@
         
         let csv = '\ufeff' + headers.join(',') + '\n';
 
-        // データ行作成
         list.forEach(item => {
             let row = [
                 item.date,
                 item.site,
                 item.worker,
                 item.total,
-                (item.note || '').replace(/,/g, ' ') // カンマ除去
+                (item.note || '').replace(/,/g, ' ')
             ];
 
             TASK_DEFINITIONS.forEach(t => {
@@ -478,7 +481,14 @@
         const a = document.createElement("a");
         
         const now = new Date();
-        const fname = `作業日報_${now.getFullYear()}${(now.getMonth()+1).toString().padStart(2,'0')}${now.getDate().toString().padStart(2,'0')}.csv`;
+        const y = now.getFullYear();
+        const m = (now.getMonth()+1).toString().padStart(2,'0');
+        const d = now.getDate().toString().padStart(2,'0');
+        const h = now.getHours().toString().padStart(2,'0');
+        const min = now.getMinutes().toString().padStart(2,'0');
+        
+        // ファイル名: 作業日報-YYYYMMDD-HHMM.csv
+        const fname = `作業日報-${y}${m}${d}-${h}${min}.csv`;
         
         a.href = url;
         a.download = fname;
@@ -486,7 +496,6 @@
         window.URL.revokeObjectURL(url);
     }
 
-    // モーダル制御
     function openSettings() { document.getElementById('settingsModal').style.display = 'block'; }
     function closeSettings() { document.getElementById('settingsModal').style.display = 'none'; }
 </script>
