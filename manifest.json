@@ -1,5 +1,5 @@
 {
-  "name": "作業日報ツール",
+  "name": "作業日報",
   "short_name": "作業日報",
   "start_url": "./index.html",
   "display": "standalone",
