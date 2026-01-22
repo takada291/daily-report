@@ -1,4 +1,4 @@
-const CACHE_NAME = 'forestry-daily-report-v1.0';
+const CACHE_NAME = 'daily-report-v0.1';
 const urlsToCache = [
   './',
   'index.html',
@@ -36,4 +36,5 @@ self.addEventListener('fetch', (event) => {
       return caches.match(event.request);
     })
   );
+
 });
